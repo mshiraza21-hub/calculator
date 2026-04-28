@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Calculator</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0d0f;
+      --surface:   #17171b;
+      --panel:     #1e1e24;
+      --border:    #2e2e38;
+      --accent:    #e8ff47;
+      --accent2:   #ff6b35;
+      --text:      #f0f0f5;
+      --muted:     #6b6b80;
+      --btn-num:   #22222a;
+      --btn-op:    #2a2a36;
+      --btn-eq:    var(--accent);
+      --radius:    16px;
+      --shadow:    0 24px 64px rgba(0,0,0,0.6);
+    }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'DM Mono', monospace;
+      overflow: hidden;
+    }
+
+    /* Animated background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(232,255,71,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(232,255,71,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      animation: gridDrift 20s linear infinite;
+      pointer-events: none;
+    }
+
+    @keyframes gridDrift {
+      0%   { transform: translate(0, 0); }
+      100% { transform: translate(40px, 40px); }
+    }
+
+    /* Glowing orb */
+    body::after {
+      content: '';
+      position: fixed;
+      width: 500px; height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(232,255,71,0.06) 0%, transparent 70%);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      animation: pulse 4s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+      50%       { transform: translate(-50%, -50%) scale(1.15); opacity: 0.7; }
+    }
+
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      animation: floatIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+
+    @keyframes floatIn {
+      from { opacity: 0; transform: translateY(30px) scale(0.95); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .calc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      box-shadow: var(--shadow), 0 0 0 1px rgba(232,255,71,0.05);
+      width: 340px;
+      overflow: hidden;
+    }
+
+    /* Header label */
+    .calc-header {
+      padding: 20px 24px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .calc-header .brand {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .calc-header .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+      animation: blink 2s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    /* Display */
+    .display {
+      padding: 24px 24px 20px;
+    }
+
+    .expression {
+      font-size: 13px;
+      color: var(--muted);
+      height: 20px;
+      text-align: right;
+      letter-spacing: 0.05em;
+      transition: opacity 0.2s;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .result {
+      text-align: right;
+      font-size: 52px;
+      font-weight: 300;
+      color: var(--text);
+      letter-spacing: -2px;
+      line-height: 1.1;
+      margin-top: 6px;
+      min-height: 60px;
+      transition: all 0.15s ease;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .result.error {
+      font-size: 22px;
+      color: var(--accent2);
+      letter-spacing: 0;
+    }
+
+    .result.pop {
+      animation: pop 0.15s ease;
+    }
+
+    @keyframes pop {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.04); }
+      100% { transform: scale(1); }
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 0 24px;
+    }
+
+    /* Buttons grid */
+    .buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      padding: 20px;
+    }
+
+    button {
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'DM Mono', monospace;
+      font-size: 18px;
+      font-weight: 400;
+      cursor: pointer;
+      height: 68px;
+      transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.1s;
+      position: relative;
+      overflow: hidden;
+      letter-spacing: -0.5px;
+    }
+
+    button::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0);
+      transition: background 0.1s;
+      border-radius: inherit;
+    }
+
+    button:hover::after  { background: rgba(255,255,255,0.05); }
+    button:active { transform: scale(0.93); }
+
+    /* Number buttons */
+    .btn-num {
+      background: var(--btn-num);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+
+    /* Operator buttons */
+    .btn-op {
+      background: var(--btn-op);
+      color: var(--accent);
+      border: 1px solid rgba(232,255,71,0.08);
+      font-size: 22px;
+    }
+
+    /* Clear / special */
+    .btn-clear {
+      background: rgba(255,107,53,0.12);
+      color: var(--accent2);
+      border: 1px solid rgba(255,107,53,0.15);
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+    }
+
+    .btn-clear:hover::after { background: rgba(255,107,53,0.08); }
+
+    /* Equals button */
+    .btn-eq {
+      background: var(--accent);
+      color: #0d0d0f;
+      font-weight: 500;
+      font-size: 26px;
+      grid-column: span 2;
+      box-shadow: 0 6px 24px rgba(232,255,71,0.25);
+    }
+
+    .btn-eq:hover::after { background: rgba(0,0,0,0.08); }
+    .btn-eq:active { box-shadow: 0 2px 8px rgba(232,255,71,0.15); }
+
+    /* Zero button wider */
+    .btn-zero {
+      grid-column: span 2;
+    }
+
+    /* Footer */
+    .calc-footer {
+      padding: 0 20px 16px;
+      text-align: center;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+
+    .calc-footer span { color: var(--accent); }
+
+    /* Server mode badge */
+    .mode-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(232,255,71,0.07);
+      border: 1px solid rgba(232,255,71,0.15);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 10px;
+      color: var(--accent);
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+    }
+
+    .mode-badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrapper">
+  <div class="calc">
+
+    <div class="calc-header">
+      <span class="brand">Calc · v1.0</span>
+      <span class="dot"></span>
+    </div>
+
+    <div class="display">
+      <div class="expression" id="expression">&nbsp;</div>
+      <div class="result" id="result">0</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="buttons">
+      <!-- Row 1 -->
+      <button class="btn-clear" onclick="clearAll()">AC</button>
+      <button class="btn-op"    onclick="toggleSign()">+/−</button>
+      <button class="btn-op"    onclick="percent()">%</button>
+      <button class="btn-op"    onclick="setOp('/')">÷</button>
+
+      <!-- Row 2 -->
+      <button class="btn-num" onclick="appendNum('7')">7</button>
+      <button class="btn-num" onclick="appendNum('8')">8</button>
+      <button class="btn-num" onclick="appendNum('9')">9</button>
+      <button class="btn-op"  onclick="setOp('*')">×</button>
+
+      <!-- Row 3 -->
+      <button class="btn-num" onclick="appendNum('4')">4</button>
+      <button class="btn-num" onclick="appendNum('5')">5</button>
+      <button class="btn-num" onclick="appendNum('6')">6</button>
+      <button class="btn-op"  onclick="setOp('-')">−</button>
+
+      <!-- Row 4 -->
+      <button class="btn-num" onclick="appendNum('1')">1</button>
+      <button class="btn-num" onclick="appendNum('2')">2</button>
+      <button class="btn-num" onclick="appendNum('3')">3</button>
+      <button class="btn-op"  onclick="setOp('+')">+</button>
+
+      <!-- Row 5 -->
+      <button class="btn-num btn-zero" onclick="appendNum('0')">0</button>
+      <button class="btn-num"          onclick="appendDot()">.</button>
+      <button class="btn-eq"           onclick="calculate()">=</button>
+    </div>
+
+    <div class="calc-footer">
+      <div class="mode-badge">Java Servlet Backend</div><br/>
+      Powered by <span>Jakarta EE + Tomcat</span>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────
+  let currentInput  = '0';
+  let previousInput = '';
+  let operator      = '';
+  let justCalculated = false;
+
+  const resultEl    = document.getElementById('result');
+  const exprEl      = document.getElementById('expression');
+
+  // ── Display helpers ────────────────────────────────────
+  function setDisplay(val) {
+    resultEl.classList.remove('error');
+    resultEl.textContent = val;
+    // shrink font for long numbers
+    resultEl.style.fontSize = val.toString().length > 10 ? '28px'
+                            : val.toString().length > 7  ? '38px' : '52px';
+  }
+
+  function popAnim() {
+    resultEl.classList.remove('pop');
+    void resultEl.offsetWidth;
+    resultEl.classList.add('pop');
+  }
+
+  // ── Input handlers ─────────────────────────────────────
+  function appendNum(n) {
+    if (justCalculated) { currentInput = ''; justCalculated = false; }
+    if (currentInput === '0' && n !== '.') currentInput = '';
+    if (currentInput.length >= 12) return;
+    currentInput += n;
+    setDisplay(currentInput);
+    popAnim();
+  }
+
+  function appendDot() {
+    if (justCalculated) { currentInput = '0'; justCalculated = false; }
+    if (currentInput.includes('.')) return;
+    if (!currentInput) currentInput = '0';
+    currentInput += '.';
+    setDisplay(currentInput);
+  }
+
+  function setOp(op) {
+    if (operator && !justCalculated) calculate(true);
+    previousInput = currentInput || previousInput;
+    operator      = op;
+    currentInput  = '';
+    justCalculated = false;
+
+    const opLabel = { '+':'+', '-':'−', '*':'×', '/':'÷' }[op];
+    exprEl.textContent = previousInput + ' ' + opLabel;
+  }
+
+  function clearAll() {
+    currentInput = '0';
+    previousInput = '';
+    operator = '';
+    justCalculated = false;
+    setDisplay('0');
+    exprEl.textContent = '\u00a0';
+  }
+
+  function toggleSign() {
+    if (!currentInput || currentInput === '0') return;
+    currentInput = (parseFloat(currentInput) * -1).toString();
+    setDisplay(currentInput);
+  }
+
+  function percent() {
+    if (!currentInput) return;
+    currentInput = (parseFloat(currentInput) / 100).toString();
+    setDisplay(currentInput);
+  }
+
+  // ── Core: call Java Servlet ────────────────────────────
+  async function calculate(silent = false) {
+    if (!operator || !previousInput || !currentInput) return;
+
+    const num1 = previousInput;
+    const num2 = currentInput;
+    const op   = operator;
+
+    if (!silent) {
+      const opLabel = { '+':'+', '-':'−', '*':'×', '/':'÷' }[op];
+      exprEl.textContent = num1 + ' ' + opLabel + ' ' + num2 + ' =';
+    }
+
+    try {
+      const body = new URLSearchParams({ num1, num2, operator: op });
+
+      // ──────────────────────────────────────────────────────
+      // BACKEND URL — change this to your Tomcat server URL
+      // e.g. http://localhost:8080/calculator/calculate
+      // ──────────────────────────────────────────────────────
+      const SERVLET_URL = '/calculate';
+
+      const res  = await fetch(SERVLET_URL, { method: 'POST', body });
+      const data = await res.json();
+
+      if (data.error) {
+        showError(data.error);
+      } else {
+        currentInput  = data.result.toString();
+        previousInput = '';
+        operator      = '';
+        justCalculated = true;
+        setDisplay(currentInput);
+        popAnim();
+      }
+    } catch (err) {
+      // Fallback: calculate in browser if server unreachable
+      let result;
+      const a = parseFloat(num1), b = parseFloat(num2);
+      switch (op) {
+        case '+': result = a + b; break;
+        case '-': result = a - b; break;
+        case '*': result = a * b; break;
+        case '/':
+          if (b === 0) { showError('Cannot divide by zero'); return; }
+          result = a / b; break;
+      }
+      // Clean result
+      result = parseFloat(result.toFixed(10));
+      currentInput  = result.toString();
+      previousInput = '';
+      operator      = '';
+      justCalculated = true;
+      setDisplay(currentInput);
+      popAnim();
+
+      if (!silent) exprEl.textContent += '  [local]';
+    }
+  }
+
+  function showError(msg) {
+    resultEl.classList.add('error');
+    resultEl.style.fontSize = '22px';
+    resultEl.textContent = msg;
+    currentInput = '0';
+    operator = '';
+    previousInput = '';
+    justCalculated = false;
+    exprEl.textContent = '\u00a0';
+  }
+
+  // ── Keyboard support ───────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if ('0123456789'.includes(e.key)) appendNum(e.key);
+    else if (e.key === '.')  appendDot();
+    else if (e.key === '+')  setOp('+');
+    else if (e.key === '-')  setOp('-');
+    else if (e.key === '*')  setOp('*');
+    else if (e.key === '/')  { e.preventDefault(); setOp('/'); }
+    else if (e.key === 'Enter' || e.key === '=') calculate();
+    else if (e.key === 'Escape' || e.key === 'c') clearAll();
+    else if (e.key === 'Backspace') {
+      currentInput = currentInput.slice(0, -1) || '0';
+      setDisplay(currentInput);
+    }
+  });
+</script>
+</body>
+</html>
